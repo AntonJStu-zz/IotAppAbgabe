@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:esense_flutter/esense.dart';
@@ -18,9 +19,11 @@ class _MyAppState extends State<MyApp> {
   bool sampling = false;
   String _event = '';
   String _button = 'not pressed';
+  String jumped = 'not jumped';
+  List<int> maxValues= [1, 1, 1, 1, 1, 1];
 
   // the name of the eSense device to connect to -- change this to your own device.
-  String eSenseName = 'eSense-0332';
+  String eSenseName = 'eSense-0058';
 
   @override
   void initState() {
@@ -83,12 +86,14 @@ class _MyAppState extends State<MyApp> {
             break;
           case AccelerometerOffsetRead:
           // TODO
+
             break;
           case AdvertisementAndConnectionIntervalRead:
           // TODO
             break;
           case SensorConfigRead:
           // TODO
+
             break;
         }
       });
@@ -108,6 +113,15 @@ class _MyAppState extends State<MyApp> {
     Timer(Duration(seconds: 3), () async => await ESenseManager.getAccelerometerOffset());
     Timer(Duration(seconds: 4), () async => await ESenseManager.getAdvertisementAndConnectionInterval());
     Timer(Duration(seconds: 5), () async => await ESenseManager.getSensorConfig());
+
+
+  }
+
+  List<int> convert(List<int> accel, List<int> gyro) {
+    List<double> radianRotation = gyro.map((g) {
+      return ((g + 32768.0) / (32511.0 + 32768.0) - 0.5) * 2 * pi;
+    });
+
   }
 
   StreamSubscription subscription;
@@ -116,7 +130,19 @@ class _MyAppState extends State<MyApp> {
     subscription = ESenseManager.sensorEvents.listen((event) {
       print('SENSOR event: $event');
       setState(() {
-        _event = event.toString();
+     _event = event.toString();
+     print(maxValues[0]);
+
+     for (int i = 0; i < 3; i++) {
+       if (maxValues[i] == null) maxValues[i] = 0;
+       if (maxValues[i+3] == null) maxValues[i+3] = 0;
+
+       maxValues[i] = (maxValues[i] > event.accel[i])?event.accel[i]:maxValues[i];
+       maxValues[i+3] = (maxValues[i+3] > event.gyro[i])?event.gyro[i]:maxValues[i+3];
+     }
+
+//        _event = event.accel[1].toString();
+//        jumped = event.accel[1] > 2000 || event.accel[1] < -2000 ? 'jumped' : 'sitting';
       });
     });
     setState(() {
@@ -137,13 +163,22 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
+
+
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('eSense Demo App'),
+          title: const Text('Florian Giner Iot App'),
+          centerTitle: true,
+          backgroundColor: Colors.blueGrey[900],
         ),
-        body: Align(
+        drawer: Drawer(
+          child: Text(
+            'Drawer header'
+          ),
+        ),
+        body: Container(
           alignment: Alignment.topLeft,
           child: ListView(
             children: [
@@ -153,9 +188,28 @@ class _MyAppState extends State<MyApp> {
               Text('eSense Button Event: \t$_button'),
               Text(''),
               Text('$_event'),
+              Text('$jumped'),
+              Text('${maxValues[0]}'),
+              Text('${maxValues[1]}'),
+              Text('${maxValues[2]}'),
+              Text('gyro'),
+              Text('${maxValues[3]}'),
+              Text('${maxValues[4]}'),
+              Text('${maxValues[5]}'),
             ],
           ),
+//          decoration: BoxDecoration(
+//            shape: BoxShape.circle,
+//            color: Colors.blue,
+//
+//          ),
         ),
+//        gameCanvas: new Container(
+//          decoration: BoxDecoration(
+//            shape: BoxShape.circle,
+//            color: Colors.blue,
+//          ),
+//        ),
         floatingActionButton: new FloatingActionButton(
           // a floating button that starts/stops listening to sensor events.
           // is disabled until we're connected to the device.
