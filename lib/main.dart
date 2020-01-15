@@ -1,36 +1,55 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math';
-
 import 'package:flutter/services.dart';
 import 'package:esense_flutter/esense.dart';
+import 'package:http/http.dart' as http;
+import 'dart:math';
 
+///
+/// Entry Point of the Program
+///
 void main() => runApp(MyApp());
 
+///
+/// Parent Widget to the entire App
+///
 class MyApp extends StatefulWidget {
   @override
   _MyAppState createState() => _MyAppState();
 }
 
+///
+/// State of the Parent Widget
+///
 class _MyAppState extends State<MyApp> {
   String _deviceName = 'Unknown';
   double _voltage = -1;
   String _deviceStatus = '';
   bool sampling = false;
   String _event = '';
-  String _button = 'not pressed';
-  String jumped = 'not jumped';
-  List<int> maxValues= [1, 1, 1, 1, 1, 1];
-
+  List<int> maxValues = [1, 1, 1, 1, 1, 1];
+  DateTime lastImageUpdate = new DateTime(2000);
+  int changedPicture = 0;
   // the name of the eSense device to connect to -- change this to your own device.
   String eSenseName = 'eSense-0058';
+  Image img;
+  String _button = '';
 
+  ///
+  // / Initializes the State of the app at the start
+  ///
   @override
   void initState() {
     super.initState();
+    img = Image.network('https://picsum.photos/400/600');
     _connectToESense();
   }
 
+  ///
+  /// Method which connects to the ESense Device and
+  /// starts the process of listening to Events coming from the device
   Future<void> _connectToESense() async {
     bool con = false;
 
@@ -69,6 +88,9 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  ///
+  /// This method reads out all events from the connected ESense device
+  ///
   void _listenToESenseEvents() async {
     ESenseManager.eSenseEvents.listen((event) {
       print('ESENSE event: $event');
@@ -82,17 +104,19 @@ class _MyAppState extends State<MyApp> {
             _voltage = (event as BatteryRead).voltage;
             break;
           case ButtonEventChanged:
-            _button = (event as ButtonEventChanged).pressed ? 'pressed' : 'not pressed';
+            _button = (event as ButtonEventChanged).pressed
+                ? 'pressed'
+                : 'not pressed';
             break;
           case AccelerometerOffsetRead:
-          // TODO
+            // TODO
 
             break;
           case AdvertisementAndConnectionIntervalRead:
-          // TODO
+            // TODO
             break;
           case SensorConfigRead:
-          // TODO
+            // TODO
 
             break;
         }
@@ -102,122 +126,226 @@ class _MyAppState extends State<MyApp> {
     _getESenseProperties();
   }
 
+  ///
+  /// method reads out all the Properties from the Esense device
+  ///
   void _getESenseProperties() async {
     // get the battery level every 10 secs
-    Timer.periodic(Duration(seconds: 10), (timer) async => await ESenseManager.getBatteryVoltage());
+    Timer.periodic(Duration(seconds: 10),
+        (timer) async => await ESenseManager.getBatteryVoltage());
 
     // wait 2, 3, 4, 5, ... secs before getting the name, offset, etc.
     // it seems like the eSense BTLE interface does NOT like to get called
     // several times in a row -- hence, delays are added in the following calls
-    Timer(Duration(seconds: 2), () async => await ESenseManager.getDeviceName());
-    Timer(Duration(seconds: 3), () async => await ESenseManager.getAccelerometerOffset());
-    Timer(Duration(seconds: 4), () async => await ESenseManager.getAdvertisementAndConnectionInterval());
-    Timer(Duration(seconds: 5), () async => await ESenseManager.getSensorConfig());
-
-
+    Timer(
+        Duration(seconds: 2), () async => await ESenseManager.getDeviceName());
+    Timer(Duration(seconds: 3),
+        () async => await ESenseManager.getAccelerometerOffset());
+    Timer(
+        Duration(seconds: 4),
+        () async =>
+            await ESenseManager.getAdvertisementAndConnectionInterval());
+    Timer(Duration(seconds: 5),
+        () async => await ESenseManager.getSensorConfig());
   }
 
-  List<int> convert(List<int> accel, List<int> gyro) {
-    List<double> radianRotation = gyro.map((g) {
-      return ((g + 32768.0) / (32511.0 + 32768.0) - 0.5) * 2 * pi;
-    });
-
+  ///
+  /// Updates the displyed image according to the direction the head was moved
+  ///
+  void updateImage(bool randomImage) {
+    var rng = new Random();
+    var url = randomImage
+        ? 'https://picsum.photos/400/600?v=${rng.nextInt(100000)}'
+        : 'https://cataas.com/cat?v=${rng.nextInt(100000)}';
+    if (DateTime.now().difference(lastImageUpdate).inSeconds > 2) {
+      lastImageUpdate = DateTime.now();
+      img = Image.network(
+        url,
+        fit: BoxFit.fill,
+        loadingBuilder: (context, child, progress) {
+          return progress == null ? child : LinearProgressIndicator();
+        },
+        height: 591,
+      );
+      changedPicture += 1;
+    }
   }
 
   StreamSubscription subscription;
+
+
+
+  ///
+  /// Method to continuously read the data from the ESense device
+  /// Interprets the gyro data to find out in which direction the head was moving
+  ///
   void _startListenToSensorEvents() async {
     // subscribe to sensor event from the eSense device
     subscription = ESenseManager.sensorEvents.listen((event) {
       print('SENSOR event: $event');
       setState(() {
-     _event = event.toString();
-     print(maxValues[0]);
+        _event = event.toString();
 
-     for (int i = 0; i < 3; i++) {
-       if (maxValues[i] == null) maxValues[i] = 0;
-       if (maxValues[i+3] == null) maxValues[i+3] = 0;
+        if (event.gyro[0].abs() < 5000 &&
+            event.gyro[1] / event.gyro[2] < 1.3 &&
+            event.gyro[1] / event.gyro[2] > 0.7 &&
+            event.gyro[1] > 5000) {
+          updateImage(true);
+        }
 
-       maxValues[i] = (maxValues[i] > event.accel[i])?event.accel[i]:maxValues[i];
-       maxValues[i+3] = (maxValues[i+3] > event.gyro[i])?event.gyro[i]:maxValues[i+3];
-     }
-
-//        _event = event.accel[1].toString();
-//        jumped = event.accel[1] > 2000 || event.accel[1] < -2000 ? 'jumped' : 'sitting';
+        if (event.gyro[0].abs() > -5000 &&
+            event.gyro[1] / event.gyro[2] < 1.3 &&
+            event.gyro[1] / event.gyro[2] > 0.7 &&
+            event.gyro[1] < -5000) {
+          updateImage(false);
+        }
       });
     });
+
     setState(() {
       sampling = true;
     });
   }
 
+  ///
+  /// pauses the continuously data reading
+  ///
   void _pauseListenToSensorEvents() async {
     subscription.cancel();
     setState(() {
       sampling = false;
     });
   }
-
+  ///
+  /// disconnects the device
+  ///
   void dispose() {
     _pauseListenToSensorEvents();
     ESenseManager.disconnect();
     super.dispose();
   }
 
+  ///
+  /// Builds the AppBar of the app
+  Widget ownAppBar() {
+    return AppBar(
+      title: const Text('Florian Giner Iot App'),
+      centerTitle: true,
+      backgroundColor: Colors.blueGrey[900],
+    );
+  }
 
+  ///
+  /// Builds the Drawer of the app
+  ///
+  Widget ownDrawer() {
+    return Drawer(
+        child: ListView(padding: EdgeInsets.zero, children: <Widget>[
+      DrawerHeader(
+        child: Center(
+          child: Text(
+            'Developer Information',
+            style: TextStyle(color: Colors.white),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        decoration: BoxDecoration(
+          color: Colors.blueGrey[900],
+        ),
+      ),
+      ListTile(
+        title: Text(_deviceStatus),
+      ),
+      ListTile(
+        title: Text(_deviceName),
+      ),
+      ListTile(
+        title: Text(_event),
+      )
+    ]));
+  }
 
+  ///
+  /// Builds the body of the app,
+  /// the body contains all the actual content of the app
+  ///
+  Widget ownColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Press play, then move your head to change the picture!',
+              style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
+            )),
+        GestureDetector(
+          onPanUpdate: (details) {
+            if (details.delta.dy < -20) {
+              setState(() {
+                updateImage(true);
+              });
+            } else if(details.delta.dy > 20) {
+              setState(() {
+                updateImage(false);
+              });
+            }
+          },
+          child: Center(
+            child: ClipRRect(
+              borderRadius: new BorderRadius.circular(8.0),
+              child: img,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  ///
+  /// Build the BottomBar of the app
+  ///
+  Widget ownBottomBar() {
+    return BottomAppBar(
+        color: Colors.blueGrey[900],
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+          child: Text(
+            ' You have changed the picture $changedPicture times!',
+            style: TextStyle(fontSize: 18, color: Colors.white),
+          ),
+        ));
+  }
+
+  ///
+  /// Builds the Floating Action Button,
+  /// which initiates the continuously reading of the data
+  Widget ownFloatingActionButton() {
+    return new FloatingActionButton(
+      // a floating button that starts/stops listening to sensor events.
+      // is disabled until we're connected to the device.
+      onPressed: (!ESenseManager.connected)
+          ? null
+          : (!sampling)
+              ? _startListenToSensorEvents
+              : _pauseListenToSensorEvents,
+      tooltip: 'Listen to eSense sensors',
+      child: (!sampling) ? Icon(Icons.play_arrow) : Icon(Icons.pause),
+      backgroundColor: Colors.blueGrey[900],
+    );
+  }
+
+  ///
+  /// Builds the App
+  ///
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Florian Giner Iot App'),
-          centerTitle: true,
-          backgroundColor: Colors.blueGrey[900],
-        ),
-        drawer: Drawer(
-          child: Text(
-            'Drawer header'
-          ),
-        ),
-        body: Container(
-          alignment: Alignment.topLeft,
-          child: ListView(
-            children: [
-              Text('eSense Device Status: \t$_deviceStatus'),
-              Text('eSense Device Name: \t$_deviceName'),
-              Text('eSense Battery Level: \t$_voltage'),
-              Text('eSense Button Event: \t$_button'),
-              Text(''),
-              Text('$_event'),
-              Text('$jumped'),
-              Text('${maxValues[0]}'),
-              Text('${maxValues[1]}'),
-              Text('${maxValues[2]}'),
-              Text('gyro'),
-              Text('${maxValues[3]}'),
-              Text('${maxValues[4]}'),
-              Text('${maxValues[5]}'),
-            ],
-          ),
-//          decoration: BoxDecoration(
-//            shape: BoxShape.circle,
-//            color: Colors.blue,
-//
-//          ),
-        ),
-//        gameCanvas: new Container(
-//          decoration: BoxDecoration(
-//            shape: BoxShape.circle,
-//            color: Colors.blue,
-//          ),
-//        ),
-        floatingActionButton: new FloatingActionButton(
-          // a floating button that starts/stops listening to sensor events.
-          // is disabled until we're connected to the device.
-          onPressed:
-          (!ESenseManager.connected) ? null : (!sampling) ? _startListenToSensorEvents : _pauseListenToSensorEvents,
-          tooltip: 'Listen to eSense sensors',
-          child: (!sampling) ? Icon(Icons.play_arrow) : Icon(Icons.pause),
-        ),
+        appBar: ownAppBar(),
+        drawer: ownDrawer(),
+        body: ownColumn(),
+        bottomNavigationBar: ownBottomBar(),
+        floatingActionButton: ownFloatingActionButton(),
       ),
     );
   }
