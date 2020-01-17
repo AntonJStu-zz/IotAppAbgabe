@@ -364,27 +364,12 @@ class _MyAppState extends State<MyApp> {
               },
             ),
           ],
+          elevation: 24.0,
         );
       },
     );
   }
 
-  Widget ownAlert() {
-      return AlertDialog(
-        title: Text('title'),
-        content: Text('asdsad'),
-        actions: <Widget>[
-          FlatButton(
-            child: Text('press'),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-          ),
-        ],
-        elevation: 24.0,
-        shape: CircleBorder(),
-      );
-  }
 
 
   ///
