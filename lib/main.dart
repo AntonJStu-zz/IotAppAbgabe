@@ -4,13 +4,12 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:esense_flutter/esense.dart';
-import 'package:http/http.dart' as http;
 import 'dart:math';
 
 ///
 /// Entry Point of the Program
 ///
-void main() => runApp(MyApp());
+void main() => runApp(MainApp());
 
 ///
 /// Parent Widget to the entire App
@@ -29,13 +28,13 @@ class _MyAppState extends State<MyApp> {
   String _deviceStatus = '';
   bool sampling = false;
   String _event = '';
-  List<int> maxValues = [1, 1, 1, 1, 1, 1];
   DateTime lastImageUpdate = new DateTime(2000);
   int changedPicture = 0;
   // the name of the eSense device to connect to -- change this to your own device.
   String eSenseName = 'eSense-0058';
   Image img;
   String _button = '';
+  bool deviceConnected = false;
 
   ///
   // / Initializes the State of the app at the start
@@ -70,6 +69,7 @@ class _MyAppState extends State<MyApp> {
             break;
           case ConnectionType.disconnected:
             _deviceStatus = 'disconnected';
+
             break;
           case ConnectionType.device_found:
             _deviceStatus = 'device_found';
@@ -84,7 +84,9 @@ class _MyAppState extends State<MyApp> {
     con = await ESenseManager.connect(eSenseName);
 
     setState(() {
+      print(con);
       _deviceStatus = con ? 'connecting' : 'connection failed';
+      deviceConnected = con ? true : false;
     });
   }
 
@@ -260,6 +262,11 @@ class _MyAppState extends State<MyApp> {
         title: Text(_deviceName),
       ),
       ListTile(
+        title: Text('Press to reconnect to ESense Device'),
+        onTap: () => _connectToESense(),
+        selected: true,
+      ),
+      ListTile(
         title: Text(_event),
       )
     ]));
@@ -324,29 +331,87 @@ class _MyAppState extends State<MyApp> {
     return new FloatingActionButton(
       // a floating button that starts/stops listening to sensor events.
       // is disabled until we're connected to the device.
-      onPressed: (!ESenseManager.connected)
+      onPressed: () {_showDialog();},/*(!ESenseManager.connected)
           ? null
           : (!sampling)
               ? _startListenToSensorEvents
-              : _pauseListenToSensorEvents,
+              : _pauseListenToSensorEvents,*/
+
       tooltip: 'Listen to eSense sensors',
-      child: (!sampling) ? Icon(Icons.play_arrow) : Icon(Icons.pause),
+      child: /*(!sampling) ? Icon(Icons.play_arrow) : */Icon(Icons.pause),
       backgroundColor: Colors.blueGrey[900],
+
     );
   }
 
+
+  void _showDialog() {
+    // flutter defined function
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        // return object of type Dialog
+        return AlertDialog(
+          title: new Text("Alert Dialog title"),
+          content: new Text("Alert Dialog body"),
+          actions: <Widget>[
+            // usually buttons at the bottom of the dialog
+            new FlatButton(
+              child: new Text("Close"),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget ownAlert() {
+      return AlertDialog(
+        title: Text('title'),
+        content: Text('asdsad'),
+        actions: <Widget>[
+          FlatButton(
+            child: Text('press'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+        elevation: 24.0,
+        shape: CircleBorder(),
+      );
+  }
+
+
   ///
-  /// Builds the App
+  /// Builds the app layout
   ///
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
+
+    return Scaffold(
         appBar: ownAppBar(),
         drawer: ownDrawer(),
         body: ownColumn(),
         bottomNavigationBar: ownBottomBar(),
         floatingActionButton: ownFloatingActionButton(),
-      ),
+
+      );
+
+  }
+}
+
+class MainApp extends StatelessWidget {
+  Widget build(BuildContext context) {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp
+    ]);
+    return MaterialApp(
+      title: 'Test',
+      home: MyApp(),
     );
   }
 }
