@@ -5,6 +5,8 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:esense_flutter/esense.dart';
 import 'dart:math';
+import 'package:flutter_blue/flutter_blue.dart';
+
 
 ///
 /// Entry Point of the Program
@@ -35,6 +37,9 @@ class _MyAppState extends State<MyApp> {
   Image img;
   String _button = '';
   bool deviceConnected = false;
+  bool playing = false;
+  FlutterBlue flutterBlue = FlutterBlue.instance;
+
 
   ///
   // / Initializes the State of the app at the start
@@ -42,7 +47,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    img = Image.network('https://picsum.photos/400/600');
+    img = Image.network('https://picsum.photos/300/300');
     _connectToESense();
   }
 
@@ -51,34 +56,45 @@ class _MyAppState extends State<MyApp> {
   /// starts the process of listening to Events coming from the device
   Future<void> _connectToESense() async {
     bool con = false;
+    
 
     // if you want to get the connection events when connecting, set up the listener BEFORE connecting...
     ESenseManager.connectionEvents.listen((event) {
       print('CONNECTION event: $event');
 
       // when we're connected to the eSense device, we can start listening to events from it
-      if (event.type == ConnectionType.connected) _listenToESenseEvents();
+      if (event.type == ConnectionType.connected) {
+        _listenToESenseEvents();
+        deviceConnected = true;
+      }
 
-      setState(() {
-        switch (event.type) {
-          case ConnectionType.connected:
-            _deviceStatus = 'connected';
-            break;
-          case ConnectionType.unknown:
-            _deviceStatus = 'unknown';
-            break;
-          case ConnectionType.disconnected:
-            _deviceStatus = 'disconnected';
+        setState(() {
+          switch (event.type) {
+            case ConnectionType.connected:
+              _deviceStatus = 'connected';
+              deviceConnected = true;
+              break;
+            case ConnectionType.unknown:
+              _deviceStatus = 'unknown';
+              deviceConnected = false;
+              break;
+            case ConnectionType.disconnected:
+              _deviceStatus = 'disconnected';
+              deviceConnected = false;
 
-            break;
-          case ConnectionType.device_found:
-            _deviceStatus = 'device_found';
-            break;
-          case ConnectionType.device_not_found:
-            _deviceStatus = 'device_not_found';
-            break;
-        }
-      });
+              break;
+            case ConnectionType.device_found:
+              _deviceStatus = 'device_found';
+
+              break;
+            case ConnectionType.device_not_found:
+              _deviceStatus = 'device_not_found';
+              deviceConnected = false;
+
+              break;
+          }
+        });
+
     });
 
     con = await ESenseManager.connect(eSenseName);
@@ -86,9 +102,12 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       print(con);
       _deviceStatus = con ? 'connecting' : 'connection failed';
-      deviceConnected = con ? true : false;
+
+      print(con);
     });
   }
+
+
 
   ///
   /// This method reads out all events from the connected ESense device
@@ -157,9 +176,9 @@ class _MyAppState extends State<MyApp> {
   void updateImage(bool randomImage) {
     var rng = new Random();
     var url = randomImage
-        ? 'https://picsum.photos/400/600?v=${rng.nextInt(100000)}'
+        ? 'https://picsum.photos/300/300?v=${rng.nextInt(100000)}'
         : 'https://cataas.com/cat?v=${rng.nextInt(100000)}';
-    if (DateTime.now().difference(lastImageUpdate).inSeconds > 2) {
+    if (DateTime.now().difference(lastImageUpdate).inSeconds > 1) {
       lastImageUpdate = DateTime.now();
       img = Image.network(
         url,
@@ -167,7 +186,8 @@ class _MyAppState extends State<MyApp> {
         loadingBuilder: (context, child, progress) {
           return progress == null ? child : LinearProgressIndicator();
         },
-        height: 591,
+        height: 300,
+        width: 300,
       );
       changedPicture += 1;
     }
@@ -227,6 +247,18 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
+  Widget bluetoothStatus() {
+    return IconButton(
+      icon: deviceConnected ?
+      Icon(Icons.bluetooth_connected,
+        color: Colors.white,)
+          : Icon(Icons.bluetooth,
+        color: Colors.white,),
+      onPressed: () {
+        showBluetoothConnection();
+      },
+    );
+  }
   ///
   /// Builds the AppBar of the app
   Widget ownAppBar() {
@@ -234,6 +266,9 @@ class _MyAppState extends State<MyApp> {
       title: const Text('Florian Giner Iot App'),
       centerTitle: true,
       backgroundColor: Colors.blueGrey[900],
+      actions: <Widget>[
+        bluetoothStatus()
+      ],
     );
   }
 
@@ -282,10 +317,13 @@ class _MyAppState extends State<MyApp> {
       children: <Widget>[
         Padding(
             padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Press play, then move your head to change the picture!',
-              style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
-            )),
+            child: Container(
+                height: 80,
+                child: Text(
+                  sampling?'Move your head up and down!' : 'Press play!',
+                  style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
+                )),
+            ),
         GestureDetector(
           onPanUpdate: (details) {
             if (details.delta.dy < -20) {
@@ -298,14 +336,28 @@ class _MyAppState extends State<MyApp> {
               });
             }
           },
-          child: Center(
-            child: ClipRRect(
-              borderRadius: new BorderRadius.circular(8.0),
-              child: img,
+          child: Container(
+            height: 300,
+            child:  Center(
+              child: ClipRRect(
+                borderRadius: new BorderRadius.circular(8.0),
+                child: img,
+              ),
             ),
-          ),
+          )
+        ),
+        IconButton(
+          onPressed:(!ESenseManager.connected)
+              ? null
+              : (!sampling)
+              ? _startListenToSensorEvents
+              : _pauseListenToSensorEvents,
+          icon: (!sampling) ? Icon(Icons.play_arrow) : Icon(Icons.pause),
+          iconSize: 80,
+          color: Colors.blueGrey[900],
         ),
       ],
+
     );
   }
 
@@ -324,23 +376,55 @@ class _MyAppState extends State<MyApp> {
         ));
   }
 
-  ///
-  /// Builds the Floating Action Button,
-  /// which initiates the continuously reading of the data
-  Widget ownFloatingActionButton() {
-    return new FloatingActionButton(
-      // a floating button that starts/stops listening to sensor events.
-      // is disabled until we're connected to the device.
-      onPressed: () {_showDialog();},/*(!ESenseManager.connected)
-          ? null
-          : (!sampling)
-              ? _startListenToSensorEvents
-              : _pauseListenToSensorEvents,*/
 
-      tooltip: 'Listen to eSense sensors',
-      child: /*(!sampling) ? Icon(Icons.play_arrow) : */Icon(Icons.pause),
-      backgroundColor: Colors.blueGrey[900],
 
+  void showBluetoothConnection() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: new Text('Connection status'),
+          content: new Container(
+            height: 400,
+            child: new Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                new Container(
+                  height: 300,
+                  width: 300,
+                  child: new ListView(
+                    children: <Widget>[
+                      new ListTile(
+                        leading: new Text(deviceConnected? 'connected':'No connection'),
+                      ),
+                      new ListTile(
+                        leading: Text(deviceConnected?_deviceName: 'No device connected'),
+
+                      ),
+
+                    ],
+                  ),
+                ),
+                new Text('Help', style: TextStyle(fontWeight: FontWeight.bold),),
+                new Text('Check if bluetooth is turned on.', textAlign: TextAlign.left, style: TextStyle(color: Colors.blueGrey),),
+                new Text('Hold down the Button on both devices until they blink blue and red.', textAlign: TextAlign.left,style: TextStyle(color: Colors.blueGrey),),
+                new Text('Press Connect.', textAlign: TextAlign.left,style: TextStyle(color: Colors.blueGrey),),
+              ],
+            ),
+          ),
+          elevation: 24.0,
+          actions: <Widget>[
+            new FlatButton(onPressed: () {
+              if(deviceConnected) {
+                Navigator.of(context).pop();
+              } else {
+                _connectToESense();
+                Navigator.of(context).pop();
+              }
+            }, child: Text(deviceConnected? 'Close':'Connect'))
+          ],
+        );
+      },
     );
   }
 
@@ -353,14 +437,21 @@ class _MyAppState extends State<MyApp> {
       builder: (BuildContext context) {
         // return object of type Dialog
         return AlertDialog(
-          title: new Text("Alert Dialog title"),
+          title: new Text("ESense Device not found!"),
           content: new Text("Alert Dialog body"),
           actions: <Widget>[
             // usually buttons at the bottom of the dialog
+
+            new FlatButton(onPressed: ()
+              {
+                _connectToESense();
+                Navigator.of(context).pop();
+
+              }
+        , child: new Text('Try again')),
             new FlatButton(
               child: new Text("Close"),
-              onPressed: () {
-                Navigator.of(context).pop();
+              onPressed: () {Navigator.of(context).pop();
               },
             ),
           ],
@@ -376,13 +467,10 @@ class _MyAppState extends State<MyApp> {
   /// Builds the app layout
   ///
   Widget build(BuildContext context) {
-
     return Scaffold(
         appBar: ownAppBar(),
-        drawer: ownDrawer(),
         body: ownColumn(),
         bottomNavigationBar: ownBottomBar(),
-        floatingActionButton: ownFloatingActionButton(),
 
       );
 
@@ -395,7 +483,7 @@ class MainApp extends StatelessWidget {
       DeviceOrientation.portraitUp
     ]);
     return MaterialApp(
-      title: 'Test',
+      title: 'Florian Giner Iot App',
       home: MyApp(),
     );
   }
