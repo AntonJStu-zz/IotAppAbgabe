@@ -5,8 +5,6 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:esense_flutter/esense.dart';
 import 'dart:math';
-import 'package:flutter_blue/flutter_blue.dart';
-
 
 ///
 /// Entry Point of the Program
@@ -38,8 +36,6 @@ class _MyAppState extends State<MyApp> {
   String _button = '';
   bool deviceConnected = false;
   bool playing = false;
-  FlutterBlue flutterBlue = FlutterBlue.instance;
-
 
   ///
   // / Initializes the State of the app at the start
@@ -56,7 +52,6 @@ class _MyAppState extends State<MyApp> {
   /// starts the process of listening to Events coming from the device
   Future<void> _connectToESense() async {
     bool con = false;
-    
 
     // if you want to get the connection events when connecting, set up the listener BEFORE connecting...
     ESenseManager.connectionEvents.listen((event) {
@@ -68,33 +63,32 @@ class _MyAppState extends State<MyApp> {
         deviceConnected = true;
       }
 
-        setState(() {
-          switch (event.type) {
-            case ConnectionType.connected:
-              _deviceStatus = 'connected';
-              deviceConnected = true;
-              break;
-            case ConnectionType.unknown:
-              _deviceStatus = 'unknown';
-              deviceConnected = false;
-              break;
-            case ConnectionType.disconnected:
-              _deviceStatus = 'disconnected';
-              deviceConnected = false;
+      setState(() {
+        switch (event.type) {
+          case ConnectionType.connected:
+            _deviceStatus = 'connected';
+            deviceConnected = true;
+            break;
+          case ConnectionType.unknown:
+            _deviceStatus = 'unknown';
+            deviceConnected = false;
+            break;
+          case ConnectionType.disconnected:
+            _deviceStatus = 'disconnected';
+            deviceConnected = false;
 
-              break;
-            case ConnectionType.device_found:
-              _deviceStatus = 'device_found';
+            break;
+          case ConnectionType.device_found:
+            _deviceStatus = 'device_found';
 
-              break;
-            case ConnectionType.device_not_found:
-              _deviceStatus = 'device_not_found';
-              deviceConnected = false;
+            break;
+          case ConnectionType.device_not_found:
+            _deviceStatus = 'device_not_found';
+            deviceConnected = false;
 
-              break;
-          }
-        });
-
+            break;
+        }
+      });
     });
 
     con = await ESenseManager.connect(eSenseName);
@@ -106,8 +100,6 @@ class _MyAppState extends State<MyApp> {
       print(con);
     });
   }
-
-
 
   ///
   /// This method reads out all events from the connected ESense device
@@ -195,8 +187,6 @@ class _MyAppState extends State<MyApp> {
 
   StreamSubscription subscription;
 
-
-
   ///
   /// Method to continuously read the data from the ESense device
   /// Interprets the gyro data to find out in which direction the head was moving
@@ -238,6 +228,7 @@ class _MyAppState extends State<MyApp> {
       sampling = false;
     });
   }
+
   ///
   /// disconnects the device
   ///
@@ -247,18 +238,27 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
+  ///
+  /// Creates the bluetooth icon with
+  /// the bluetooth settings
+  ///
   Widget bluetoothStatus() {
     return IconButton(
-      icon: deviceConnected ?
-      Icon(Icons.bluetooth_connected,
-        color: Colors.white,)
-          : Icon(Icons.bluetooth,
-        color: Colors.white,),
+      icon: deviceConnected
+          ? Icon(
+              Icons.bluetooth_connected,
+              color: Colors.white,
+            )
+          : Icon(
+              Icons.bluetooth,
+              color: Colors.white,
+            ),
       onPressed: () {
         showBluetoothConnection();
       },
     );
   }
+
   ///
   /// Builds the AppBar of the app
   Widget ownAppBar() {
@@ -266,45 +266,8 @@ class _MyAppState extends State<MyApp> {
       title: const Text('Florian Giner Iot App'),
       centerTitle: true,
       backgroundColor: Colors.blueGrey[900],
-      actions: <Widget>[
-        bluetoothStatus()
-      ],
+      actions: <Widget>[bluetoothStatus()],
     );
-  }
-
-  ///
-  /// Builds the Drawer of the app
-  ///
-  Widget ownDrawer() {
-    return Drawer(
-        child: ListView(padding: EdgeInsets.zero, children: <Widget>[
-      DrawerHeader(
-        child: Center(
-          child: Text(
-            'Developer Information',
-            style: TextStyle(color: Colors.white),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        decoration: BoxDecoration(
-          color: Colors.blueGrey[900],
-        ),
-      ),
-      ListTile(
-        title: Text(_deviceStatus),
-      ),
-      ListTile(
-        title: Text(_deviceName),
-      ),
-      ListTile(
-        title: Text('Press to reconnect to ESense Device'),
-        onTap: () => _connectToESense(),
-        selected: true,
-      ),
-      ListTile(
-        title: Text(_event),
-      )
-    ]));
   }
 
   ///
@@ -316,48 +279,46 @@ class _MyAppState extends State<MyApp> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Container(
-                height: 80,
-                child: Text(
-                  sampling?'Move your head up and down!' : 'Press play!',
-                  style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
-                )),
-            ),
-        GestureDetector(
-          onPanUpdate: (details) {
-            if (details.delta.dy < -20) {
-              setState(() {
-                updateImage(true);
-              });
-            } else if(details.delta.dy > 20) {
-              setState(() {
-                updateImage(false);
-              });
-            }
-          },
+          padding: EdgeInsets.all(16.0),
           child: Container(
-            height: 300,
-            child:  Center(
-              child: ClipRRect(
-                borderRadius: new BorderRadius.circular(8.0),
-                child: img,
-              ),
-            ),
-          )
+              height: 80,
+              child: Text(
+                sampling ? 'Move your head up and down!' : 'Press play!',
+                style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
+              )),
         ),
+        GestureDetector(
+            onPanUpdate: (details) {
+              if (details.delta.dy < -20) {
+                setState(() {
+                  updateImage(true);
+                });
+              } else if (details.delta.dy > 20) {
+                setState(() {
+                  updateImage(false);
+                });
+              }
+            },
+            child: Container(
+              height: 300,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: new BorderRadius.circular(8.0),
+                  child: img,
+                ),
+              ),
+            )),
         IconButton(
-          onPressed:(!ESenseManager.connected)
+          onPressed: (!ESenseManager.connected)
               ? null
               : (!sampling)
-              ? _startListenToSensorEvents
-              : _pauseListenToSensorEvents,
+                  ? _startListenToSensorEvents
+                  : _pauseListenToSensorEvents,
           icon: (!sampling) ? Icon(Icons.play_arrow) : Icon(Icons.pause),
           iconSize: 80,
           color: Colors.blueGrey[900],
         ),
       ],
-
     );
   }
 
@@ -376,8 +337,10 @@ class _MyAppState extends State<MyApp> {
         ));
   }
 
-
-
+  ///
+  /// creates the alerts that displays
+  /// the bluetooth connection details
+  ///
   void showBluetoothConnection() {
     showDialog(
       context: context,
@@ -395,93 +358,75 @@ class _MyAppState extends State<MyApp> {
                   child: new ListView(
                     children: <Widget>[
                       new ListTile(
-                        leading: new Text(deviceConnected? 'connected':'No connection'),
+                        leading: new Text(
+                            deviceConnected ? 'connected' : 'No connection'),
                       ),
                       new ListTile(
-                        leading: Text(deviceConnected?_deviceName: 'No device connected'),
-
+                        leading: Text(deviceConnected
+                            ? _deviceName
+                            : 'No device connected'),
                       ),
-
                     ],
                   ),
                 ),
-                new Text('Help', style: TextStyle(fontWeight: FontWeight.bold),),
-                new Text('Check if bluetooth is turned on.', textAlign: TextAlign.left, style: TextStyle(color: Colors.blueGrey),),
-                new Text('Hold down the Button on both devices until they blink blue and red.', textAlign: TextAlign.left,style: TextStyle(color: Colors.blueGrey),),
-                new Text('Press Connect.', textAlign: TextAlign.left,style: TextStyle(color: Colors.blueGrey),),
+                new Text(
+                  'Help',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                new Text(
+                  'Check if bluetooth is turned on.',
+                  textAlign: TextAlign.left,
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+                new Text(
+                  'Hold down the Button on both devices until they blink blue and red.',
+                  textAlign: TextAlign.left,
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
+                new Text(
+                  'Press Connect.',
+                  textAlign: TextAlign.left,
+                  style: TextStyle(color: Colors.blueGrey),
+                ),
               ],
             ),
           ),
           elevation: 24.0,
           actions: <Widget>[
-            new FlatButton(onPressed: () {
-              if(deviceConnected) {
-                Navigator.of(context).pop();
-              } else {
-                _connectToESense();
-                Navigator.of(context).pop();
-              }
-            }, child: Text(deviceConnected? 'Close':'Connect'))
-          ],
-        );
-      },
-    );
-  }
-
-
-  void _showDialog() {
-    // flutter defined function
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        // return object of type Dialog
-        return AlertDialog(
-          title: new Text("ESense Device not found!"),
-          content: new Text("Alert Dialog body"),
-          actions: <Widget>[
-            // usually buttons at the bottom of the dialog
-
-            new FlatButton(onPressed: ()
-              {
-                _connectToESense();
-                Navigator.of(context).pop();
-
-              }
-        , child: new Text('Try again')),
             new FlatButton(
-              child: new Text("Close"),
-              onPressed: () {Navigator.of(context).pop();
-              },
-            ),
+                onPressed: () {
+                  if (deviceConnected) {
+                    Navigator.of(context).pop();
+                  } else {
+                    _connectToESense();
+                    Navigator.of(context).pop();
+                  }
+                },
+                child: Text(deviceConnected ? 'Close' : 'Connect'))
           ],
-          elevation: 24.0,
         );
       },
     );
   }
-
-
 
   ///
   /// Builds the app layout
   ///
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: ownAppBar(),
-        body: ownColumn(),
-        bottomNavigationBar: ownBottomBar(),
-
-      );
-
+      appBar: ownAppBar(),
+      body: ownColumn(),
+      bottomNavigationBar: ownBottomBar(),
+    );
   }
 }
 
+///
+/// Parent Widget to app
+///
 class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp
-    ]);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     return MaterialApp(
       title: 'Florian Giner Iot App',
       home: MyApp(),
